@@ -1,60 +1,56 @@
 package linalg
 
+import linalg.LinAlg.Vec
+
+import scala.collection.{AbstractSeq, TraversableLike}
+
+
+object LinAlg {
+
+  type Vec=Seq[Double]
+
+  def op(v:Vec,w:Vec,f:(Double,Double)=>Double)=v.zip(w).map(x=>f(x._1,x._2))
+
+  def +(v:Vec,w:Vec)=op(v,w,_+_)
+
+  def +(v:Vec,d:Double)=v map (_+d)
+
+  def *(v:Vec,w:Vec)=op(v,w,_*_)
+
+  /** Dot product **/
+  def dot(v:Vec,w:Vec) = *(v,w).sum
+
+
+}
 
 /**
   *
   */
-trait Matrix {
+trait Matrix extends Seq[Double] {
 
-  def op(w:Matrix,op:(Double,Double)=>(Double)):Matrix
-
-  def toSeq():Seq[Double]
-
-  /** Row-wise */
-  def +(w:Vec)=op(w,_+_)
-
-  def +(d:Double)=new Vec(toSeq().map(_+d))
-
-  def :*(w:Vec)=op(w,_*_)
-
-  /** Dot product **/
-  def *(w:Vec)=op(w,_*_).toSeq().sum
-
-}
-
-class VectorBasedMatrix(v:Seq[Double],n:Int=0,m:Int=0) extends Matrix{
-
-  val rows = if (n > 0) n else v.size/m
-  val cols = if (m > 0) m else v.size/n
-  val data = v.toVector
-
-  require(rows*cols == data.size)
-
-  def toSeq() = data
-
-  /** Apply binary operation pairwise to elements of two matrices **/
-  def op(w:Matrix,op:(Double,Double)=>(Double))=
-    new VectorBasedMatrix(toSeq.zip(w.toSeq()).map(x=>op(x._1,x._2)))
+  def apply(i:Int,j:Int)
+  def rows:Int
+  def cols:Int
 
 
 }
 
-class Vec(v:Seq[Double]) extends VectorBasedMatrix(v,m=1)
+class RowMatrix(v:Seq[Double],width:Int) extends AbstractSeq[Double] with Matrix {
 
-object Vec {
-  def apply(elems:Double*)=new Vec(elems.toVector)
-  def apply(elems:Vector[Double])=new Vec(elems.toVector)
-}
+  require(v.size % width == 0)
 
+  def rows=v.size / width
 
-class DataColumn[D](val name:String, data:Seq[D])
+  def cols=width
 
+  def apply(i:Int,j:Int)=v(i*width+j)
 
-class DataFrame(columns:DataColumn[Any])
+  override def iterator = v.iterator
 
-object DataFrame {
+  override def apply(idx: Int): Double = v(idx)
 
-  // def fromRows(names:Seq[String],types:Seq[Ty])
+  override def length = v.length
+
 
 }
 
