@@ -1,69 +1,88 @@
+import GradientDescent.{gridStepSizes, toleranceStop}
+import LinAlg.{Vec, save,format}
+
 import scala.util.Random
-import LinAlg.SeqMathOps
 import scala.annotation.tailrec
 
 /**
-  * Created by Dirk on 15.04.17.
+  * One step of a gradient descent algorithm
+  *
+  * @param grad Gradient including function
+  * @param pos Current position/coordinates
+  * @param stepSizes Sequence of possible step sizes
+  * @param stop Predicate if continue
+  * @param previous Previous descent step (if any)
   */
-case class GradientDescent(
-                       func:Seq[Double] => Double,
-                       grad:Seq[Double]=>Seq[Double],
-                       v:Seq[Double],
-                       tolerance:Double=0.000001,
-                       stepSizes:Seq[Double] = List(100,10,1,0.1,.01,.001,.0001,.00001),
-                       previousDescent:Option[GradientDescent]=None)
+case class GradientDescent( grad:Gradient, pos:Vec,
+                            stepSizes:GradientDescent => Seq[Double] =gridStepSizes,
+                            stop:(GradientDescent, Vec) => Boolean=toleranceStop(_,_,0.000001),
+                            previous:Option[GradientDescent]=None)
   extends Traversable[GradientDescent] {
 
-  type Vec = Seq[Double]
 
-  def value:Double=func(v)
+  def value:Double=grad.func(pos)
 
-  def count:Int= if (previousDescent.isEmpty) 1 else previousDescent.get.count + 1
+  def count:Int= previous map (_.count + 1) getOrElse 1
 
-  private def save(func:Vec => Double,v:Vec):Double={
-    val x = func(v)
-    if (x.isNaN) Double.PositiveInfinity else x
-  }
-
+  /**
+    * Try one step.
+    * @param v current position
+    * @param direction direction of descent
+    * @param stepSize candidate stepsize
+    * @return new position
+    */
   private def step(v:Vec, direction:Vec, stepSize:Double):Vec =
     v.zip(direction).map { case (vi,zi) => vi + stepSize* zi }
 
+  /** Recursively descent
+    * @return last step
+    */
   @tailrec final def minimize:GradientDescent= {
-    val negGradient = grad(v).map(-_)
-    val vMinFunc:Vec = stepSizes map { step(v,negGradient,_) } minBy { save(func,_) }
-    if (previousDescent.isDefined)
-      if ( Math.abs(previousDescent.get.value - func(vMinFunc)) < tolerance )
-        return this
-    GradientDescent(func,grad,vMinFunc,tolerance,stepSizes,Some(this)).minimize
+    val negGradient = grad(pos).map(-_)
+    val vMinFunc = stepSizes(this) map { step(pos,negGradient,_) } minBy { save(grad.func,_,Double.PositiveInfinity) }
+    if ( stop(this,vMinFunc) ) return this
+    new GradientDescent(grad,vMinFunc,stepSizes,stop,Some(this)).minimize
   }
 
+  /* Iterate beginning first until this step */
   override def foreach[U](f: (GradientDescent) => U)= {
-    if (previousDescent.isDefined) previousDescent.get.foreach(f)
+    previous.foreach(_.foreach(f))
     f(this)
   }
-
-
 }
-
 
 object GradientDescent {
 
-  type Vec = Seq[Double]
+  /** Stops if objective does not improve beyond tolerance. */
+  def toleranceStop(gd:GradientDescent, nextV:Vec,tolerance:Double):Boolean=
+    Math.abs(gd.value - gd.grad.func(nextV)) < tolerance
 
-  def test {
+  def gridStepSizes(gd:GradientDescent):Seq[Double]=
+    List(100,10,1,.1,.01,.001,.0001,.00001)
 
-    def sumOfSquares(v:Vec):Double=v.map(x=>x*x).sum
-    def sumOfSquaresGradient(v:Vec):Vec=v.map(x=>2*x)
+  def minimize(grad:Gradient,start:Vec):GradientDescent=apply(grad,start).minimize
 
-    // Random start with 3 coordinates from [-10,10)
-    val vStart = Seq.fill(3)(Random.nextDouble*20-10)
+  def maximize(grad:Gradient, start:Vec):GradientDescent=minimize(grad.negate,start)
 
-    val min = GradientDescent(sumOfSquares,sumOfSquaresGradient,vStart).minimize
 
-    println(s"Steps: ${min.count}")
-    min.foreach { gd =>
-      printf("%f --> %f\n",gd.value,gd.value)
+  def test(dim:Int=3,dist:Double=10) {
+
+    println(s"Descending $dim-dimensional v*v. Random start coordinates in [-$dist,$dist) ...")
+
+    val min = minimize(
+      Gradient(
+        _.map(x=>x*x).sum,                          // function
+        (v,i) => 2*v(i)),                           // ith derivative
+      Seq.fill(dim)(Random.nextDouble*2*dist-dist)) // start random
+
+    println("i\tValue\tPosition\n" + "="*30)
+    min.foreach {
+      gd => printf("%s\t%.4f\t",gd.count,gd.value)
+        println(format(gd.pos,"%.4f"))
     }
+    printf("Expecting value 0 at position (0"+",0"*dim+")")
+
+
   }
 
 }

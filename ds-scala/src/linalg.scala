@@ -1,10 +1,12 @@
-//package linalg
-
 import scala.collection.AbstractSeq
 
 object LinAlg {
 
-/** Infix operators to treat sequences like math vec */
+  type Vec = Seq[Double]
+
+  val locale = java.util.Locale.US
+
+  /** Infix operators to treat sequences like math vec */
 implicit class SeqMathOps(val v:Seq[Double]) extends AnyVal {
 
   type Vec = Seq[Double]
@@ -32,7 +34,40 @@ implicit class SeqMathOps(val v:Seq[Double]) extends AnyVal {
 
 }
 
+  /** Return Infinity where function NaN */
+  def save(func:Vec => Double,v:Vec,fallback:Double):Double={
+    val x = func(v)
+    if (x.isNaN) fallback else x
+  }
 
+  /** Negate vector function */
+  def negateVecFunc[T](f:T => Vec):T=>Vec= { v:T => f(v).map {-_} }
+
+  /** Negate real function (one argument) */
+  def negateDoubleFunc[T](f:T => Double):T=>Double={ v:T => -f(v)}
+
+  /* Why not working?
+
+  def negate[T,R](f:T => R):(T=>R) = f match {
+      case vf:(T=>Vec)    => v:T => vf(v).map {-_}
+      case df:(T=>Double) =>  v:T => -df(v)
+      case _ => throw new IllegalArgumentException(s"Not evaluating to Vec or Double: $f")
+  }
+  */
+
+  /** Negate real function (two arguments) */
+  def negateDoubleFunc[T1,T2](f:(T1,T2) => Double):(T1,T2) => Double={(v:T1,i:T2) => -f(v,i) }
+
+  /** Applies function to all vector elements */
+  def elementwise(v:Vec, f:(Vec,Int)=>Double):Vec= v.indices map { f(v,_) }
+
+
+  /** String interpolate vecto elements */
+  def format(v:Vec,ipol:String,start:String="(",end:String=")"):String={
+    v./: (start) { (s,d) =>
+      s +  { if (s != start)  "," else "" } + ( ipol formatLocal(locale, d) )
+    } + end
+  }
 
   /**
     *
