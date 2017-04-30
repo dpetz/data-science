@@ -4,21 +4,19 @@
 
 import Json.{Arr, Lexer, Num, Str}
 
-import scala.collection.AbstractSeq
+import scala.collection.immutable.ListMap
+import scala.collection.{AbstractIterable, AbstractSeq, immutable, mutable}
 import scala.util.Try
 import scala.util.matching.Regex.Match
 import scala.util.matching.Regex
 
-/** Parsed JSON String */
+/** Parsed JSON String.
+  * @param in Start of parsing
+  */
 abstract class Json(in:Lexer) {
-  def out:Lexer=in.follow
-  def toArr:Option[Arr]=None
-  def toNum:Option[Num]=None
-  def toStr:Option[Str]=None
-  def isNull:Boolean=false
-  def isTrue:Boolean=false
-  def isFalse:Boolean=false
-  override def toString=in.first.toString
+  /** After parsing */
+  def out:Lexer = in.next()
+  override def toString = s"${getClass.getName}(${in.tok.get})"
 }
 
 /**
@@ -33,7 +31,13 @@ abstract class Json(in:Lexer) {
   */
 object Json {
 
-  val sampleObject =
+  val regex:Regex = """(?:\s*)([\{\}\[\]:,]|"[^"]*"|[\d-+.eE]+|null|true|false)""".r
+
+  // TODO: http://www.scalatest.org/
+
+  object Test {
+  
+  val complex =
     """{
       |  "Herausgeber": "Xema",
       |  "Nummer": "1234-5678-9012-3456",
@@ -52,145 +56,125 @@ object Json {
       |}
     """.stripMargin
 
-  val sampleMatrix= """[[1,49,4,0],[1,41,9,0],[1,40,8,0],[1,25,6,0],[1,21,1,0],[1,21,0,0],[1,19,3,0],[1,19,0,0],[1,18,9,0],[1,18,8,0],[1,16,4,0],[1,15,3,0],[1,15,0,0],[1,15,2,0],[1,15,7,0],[1,14,0,0],[1,14,1,0],[1,13,1,0],[1,13,7,0],[1,13,4,0],[1,13,2,0],[1,12,5,0],[1,12,0,0],[1,11,9,0],[1,10,9,0],[1,10,1,0],[1,10,1,0],[1,10,7,0],[1,10,9,0],[1,10,1,0],[1,10,6,0],[1,10,6,0],[1,10,8,0],[1,10,10,0],[1,10,6,0],[1,10,0,0],[1,10,5,0],[1,10,3,0],[1,10,4,0],[1,9,9,0],[1,9,9,0],[1,9,0,0],[1,9,0,0],[1,9,6,0],[1,9,10,0],[1,9,8,0],[1,9,5,0],[1,9,2,0],[1,9,9,0],[1,9,10,0],[1,9,7,0],[1,9,2,0],[1,9,0,0],[1,9,4,0],[1,9,6,0],[1,9,4,0],[1,9,7,0],[1,8,3,0],[1,8,2,0],[1,8,4,0],[1,8,9,0],[1,8,2,0],[1,8,3,0],[1,8,5,0],[1,8,8,0],[1,8,0,0],[1,8,9,0],[1,8,10,0],[1,8,5,0],[1,8,5,0],[1,7,5,0],[1,7,5,0],[1,7,0,0],[1,7,2,0],[1,7,8,0],[1,7,10,0],[1,7,5,0],[1,7,3,0],[1,7,3,0],[1,7,6,0],[1,7,7,0],[1,7,7,0],[1,7,9,0],[1,7,3,0],[1,7,8,0],[1,6,4,0],[1,6,6,0],[1,6,4,0],[1,6,9,0],[1,6,0,0],[1,6,1,0],[1,6,4,0],[1,6,1,0],[1,6,0,0],[1,6,7,0],[1,6,0,0],[1,6,8,0],[1,6,4,0],[1,6,2,1],[1,6,1,1],[1,6,3,1],[1,6,6,1],[1,6,4,1],[1,6,4,1],[1,6,1,1],[1,6,3,1],[1,6,4,1],[1,5,1,1],[1,5,9,1],[1,5,4,1],[1,5,6,1],[1,5,4,1],[1,5,4,1],[1,5,10,1],[1,5,5,1],[1,5,2,1],[1,5,4,1],[1,5,4,1],[1,5,9,1],[1,5,3,1],[1,5,10,1],[1,5,2,1],[1,5,2,1],[1,5,9,1],[1,4,8,1],[1,4,6,1],[1,4,0,1],[1,4,10,1],[1,4,5,1],[1,4,10,1],[1,4,9,1],[1,4,1,1],[1,4,4,1],[1,4,4,1],[1,4,0,1],[1,4,3,1],[1,4,1,1],[1,4,3,1],[1,4,2,1],[1,4,4,1],[1,4,4,1],[1,4,8,1],[1,4,2,1],[1,4,4,1],[1,3,2,1],[1,3,6,1],[1,3,4,1],[1,3,7,1],[1,3,4,1],[1,3,1,1],[1,3,10,1],[1,3,3,1],[1,3,4,1],[1,3,7,1],[1,3,5,1],[1,3,6,1],[1,3,1,1],[1,3,6,1],[1,3,10,1],[1,3,2,1],[1,3,4,1],[1,3,2,1],[1,3,1,1],[1,3,5,1],[1,2,4,1],[1,2,2,1],[1,2,8,1],[1,2,3,1],[1,2,1,1],[1,2,9,1],[1,2,10,1],[1,2,9,1],[1,2,4,1],[1,2,5,1],[1,2,0,1],[1,2,9,1],[1,2,9,1],[1,2,0,1],[1,2,1,1],[1,2,1,1],[1,2,4,1],[1,1,0,1],[1,1,2,1],[1,1,2,1],[1,1,5,1],[1,1,3,1],[1,1,10,1],[1,1,6,1],[1,1,0,1],[1,1,8,1],[1,1,6,1],[1,1,4,1],[1,1,9,1],[1,1,9,1],[1,1,4,1],[1,1,2,1],[1,1,9,1],[1,1,0,1],[1,1,8,1],[1,1,6,1],[1,1,1,1],[1,1,1,1],[1,1,5,1]]"""
-  val sampleList= """[ "zehn",10, 55.75466, true,-44.565, 55e-2, 69234.2423432E78,null ]"""
-  val sampleEmptyList = """[]"""
-  lazy val lexer = new Lexer(sampleList)
-  lazy val json = Json(lexer)
+  val matrix= """[[1,49,4,0],[1,41,9,0],[1,40,8,0],[1,25,6,0],[1,21,1,0],[1,21,0,0],[1,19,3,0],[1,19,0,0],[1,18,9,0],[1,18,8,0],[1,16,4,0],[1,15,3,0],[1,15,0,0],[1,15,2,0],[1,15,7,0],[1,14,0,0],[1,14,1,0],[1,13,1,0],[1,13,7,0],[1,13,4,0],[1,13,2,0],[1,12,5,0],[1,12,0,0],[1,11,9,0],[1,10,9,0],[1,10,1,0],[1,10,1,0],[1,10,7,0],[1,10,9,0],[1,10,1,0],[1,10,6,0],[1,10,6,0],[1,10,8,0],[1,10,10,0],[1,10,6,0],[1,10,0,0],[1,10,5,0],[1,10,3,0],[1,10,4,0],[1,9,9,0],[1,9,9,0],[1,9,0,0],[1,9,0,0],[1,9,6,0],[1,9,10,0],[1,9,8,0],[1,9,5,0],[1,9,2,0],[1,9,9,0],[1,9,10,0],[1,9,7,0],[1,9,2,0],[1,9,0,0],[1,9,4,0],[1,9,6,0],[1,9,4,0],[1,9,7,0],[1,8,3,0],[1,8,2,0],[1,8,4,0],[1,8,9,0],[1,8,2,0],[1,8,3,0],[1,8,5,0],[1,8,8,0],[1,8,0,0],[1,8,9,0],[1,8,10,0],[1,8,5,0],[1,8,5,0],[1,7,5,0],[1,7,5,0],[1,7,0,0],[1,7,2,0],[1,7,8,0],[1,7,10,0],[1,7,5,0],[1,7,3,0],[1,7,3,0],[1,7,6,0],[1,7,7,0],[1,7,7,0],[1,7,9,0],[1,7,3,0],[1,7,8,0],[1,6,4,0],[1,6,6,0],[1,6,4,0],[1,6,9,0],[1,6,0,0],[1,6,1,0],[1,6,4,0],[1,6,1,0],[1,6,0,0],[1,6,7,0],[1,6,0,0],[1,6,8,0],[1,6,4,0],[1,6,2,1],[1,6,1,1],[1,6,3,1],[1,6,6,1],[1,6,4,1],[1,6,4,1],[1,6,1,1],[1,6,3,1],[1,6,4,1],[1,5,1,1],[1,5,9,1],[1,5,4,1],[1,5,6,1],[1,5,4,1],[1,5,4,1],[1,5,10,1],[1,5,5,1],[1,5,2,1],[1,5,4,1],[1,5,4,1],[1,5,9,1],[1,5,3,1],[1,5,10,1],[1,5,2,1],[1,5,2,1],[1,5,9,1],[1,4,8,1],[1,4,6,1],[1,4,0,1],[1,4,10,1],[1,4,5,1],[1,4,10,1],[1,4,9,1],[1,4,1,1],[1,4,4,1],[1,4,4,1],[1,4,0,1],[1,4,3,1],[1,4,1,1],[1,4,3,1],[1,4,2,1],[1,4,4,1],[1,4,4,1],[1,4,8,1],[1,4,2,1],[1,4,4,1],[1,3,2,1],[1,3,6,1],[1,3,4,1],[1,3,7,1],[1,3,4,1],[1,3,1,1],[1,3,10,1],[1,3,3,1],[1,3,4,1],[1,3,7,1],[1,3,5,1],[1,3,6,1],[1,3,1,1],[1,3,6,1],[1,3,10,1],[1,3,2,1],[1,3,4,1],[1,3,2,1],[1,3,1,1],[1,3,5,1],[1,2,4,1],[1,2,2,1],[1,2,8,1],[1,2,3,1],[1,2,1,1],[1,2,9,1],[1,2,10,1],[1,2,9,1],[1,2,4,1],[1,2,5,1],[1,2,0,1],[1,2,9,1],[1,2,9,1],[1,2,0,1],[1,2,1,1],[1,2,1,1],[1,2,4,1],[1,1,0,1],[1,1,2,1],[1,1,2,1],[1,1,5,1],[1,1,3,1],[1,1,10,1],[1,1,6,1],[1,1,0,1],[1,1,8,1],[1,1,6,1],[1,1,4,1],[1,1,9,1],[1,1,9,1],[1,1,4,1],[1,1,2,1],[1,1,9,1],[1,1,0,1],[1,1,8,1],[1,1,6,1],[1,1,1,1],[1,1,1,1],[1,1,5,1]]"""
+  val list= """[ "zehn",10, 55.75466, true,-44.565, 55e-2, 69234.2423432E78,null ]"""
+  val emptyList = """[]"""
+  // import Json.Lexer; val json = Json ( new Lexer(Json.Test.complex) )
 
-  /** Split JSON String in it's tokens
-    *
-    */
-  case class Lexer(s:CharSequence) {
-
-    /** Any of: Number,String,[,],{,} */
-
-    /** First match */
-    private val fm: Option[Match] = Lexer.re.findPrefixMatchOf(s)
-
-    /** First token */
-    val first: Token =
-      Token (fm.map { _.group(1) })
-
-    /** Shorthand for first */
-    def ^():Token=first
-
-    def ?(e:String):Boolean= first == e
-
-
-    /** Following tokens */
-    lazy val follow: Lexer =
-      Lexer (fm.map { _.after } getOrElse "")
-
-    /** consume first token */
-    def >>(e: String): Lexer = {
-      first.assert(e)
-      follow
-    }
-
-    /** consume first token if matches */
-    def ~>(e: String): Lexer = {
-      println(s"Testing if $this consuming $e ...")
-      if (first == e) follow else this
-    }
-
-    def >>(e:Option[String]):Lexer= e.map(>>(_)).getOrElse(this)
-
-  }
-
-  object Lexer {
-    val re:Regex = """(?:\s*)([\{\}\[\]:,]|".*"|[\d-.eE]*|null|true|false)""".r
-    val empty = new Lexer("")
-  }
-
-  case class Token(s:Option[String]) {
-
-    /** Returns first token as Double (else exception)*/
-    def double:Double = {
-      Try {
-        s.get.toDouble
-      } getOrElse {
-        failed ("Double")
-        .0
-      }
-
-    }
-
-    /** Returns first token as String (else exception) */
-    def string:String = {
-      Try {
-        s.get.toString.replace("\"","")
-      } getOrElse {
-        failed("String")
-        ""
-      }
-    }
-
-    def isEmpty= s.isEmpty | s.get.isEmpty
-    def get=s getOrElse ""
-
-    override def toString = s getOrElse "None"
-
-    def assert(e:String) {
-       if (this!=e) failed(e)
-    }
-
-    def ==(t:String):Boolean= s contains t
-    def !=(t:String):Boolean= ! ==(t)
-
-    private def failed(e:String) {
-      throw new IllegalArgumentException (s"Not a $e: $s")
-    }
   }
 
   def apply(in:Lexer):Json = {
-    println(s"Parsing ${in.first} ...")
-    in.first.get.charAt(0) match {
+    println(s"Parsing ${in.tok} ...")
+    in.tok.get.charAt(0) match {
       case '[' => Arr(in,Some("["))
+      case '{' => Obj(in,Some("{"))
       case '"' => Str(in)
-      case 'n' => Null(in)
-      case 't' => Bool(in)
-      case 'f' => Bool(in)
-      case _   => Num(in)
+      case 'n' | 't' | 'f' => Sym(in)
+      case _ => Num(in)
     }
   }
 
-  /** Parser for JSON Arrays */
-  case class Arr(in:Lexer, consume:Option[String]=None) extends Json(in) {
-      val head:Json = Json(in >> consume)
-      val tail:Option[Arr] = if (head.out ? "]") None else Some (Arr(head.out,Some(",")))
-      override def out:Lexer = tail map(_.out) getOrElse (head.out >> "]")
-      lazy val toSeq:Seq[Json]= tail map (head :: _.toSeq.toList) getOrElse List(head)
-      override def toString:String = "[" + toSeq.mkString(",") + "]"
-      override def toArr = Some(this)
+  def apply(s:String):Json=apply(new Lexer(s))
+  /**
+    * Parses JSON String into sequence of string tokens.
+    * Use 'tok' to access current token and '>>' to progress to next token.
+    */
+  case class Lexer(s:CharSequence) {
+
+    val fm:Option[Match] = Json.regex.findPrefixMatchOf(s)
+
+    /** Current token. Any of: Number,String,[,],{,} */
+    def tok: Option[String] = fm.map { _.group(1) }
+
+    /** Check if current token equals a string */
+    def ?(s:String):Boolean = tok contains s
+
+    /** Consumes first token.
+      * @param check Assert current token
+      */
+    def next(check:Option[String]=None):Lexer= {
+      for (s <- check ) { assert( ?(s), s ) }
+      println(s"$tok --> ${fm.get.after}")
+      Lexer (fm.map { _.after }  getOrElse {
+        throw new UnsupportedOperationException("No more tokens.")
+        ""
+      })
     }
 
+    def toSeq:Seq[String]= tok map { _ :: next().toSeq.toList } getOrElse List()
+
+    override def toString = s"Lexer($s)"
+
+  }
+
+  /** Call methods like 'next' without need to wrap string as option  **/
+  implicit def Str2Opt( x : String) : Option[String] = Option(x)
+
+  /** A parsed JSON array. It works like a list:
+    * 'head' points to current element, 'tail' to successors. */
+  case class Arr(lex:Lexer, consume:Option[String]=None) extends Json(lex) {
+
+    private def first=consume.map ( lex next _ ) getOrElse lex
+
+    /** Current Array element */
+      val head:Option[Json] = if (first ? "]") None else Some(Json(first))
+
+      /** Subsequent array elements ore none for last element */
+      val tail:Option[Arr] =
+        if ( head forall (_.out ? "]") ) None
+        else Some (Arr(head.get.out,","))
+
+      /** Recursively parse all elements */
+      override def out:Lexer = toSeq.lastOption.map (_.out).getOrElse(first).next("]")
+
+      /** Wrap as sequence */
+      lazy val toSeq:Seq[Json]= head.map { h =>
+        tail map (h :: _.toSeq.toList) getOrElse List(h)
+        } getOrElse List()
+
+      override def toString:String = s"${getClass.getName}(${toSeq.mkString(",")})"
+    }
+
+  /** A parsed JSON object. It works like a MapList:
+    * 'head' points to current (name,value) pair, 'tail' to successor pairs. */
+  case class Obj(lex:Lexer, consume:Option[String]=None) extends Json(lex) {
+
+    private def first=consume.map ( lex next _ ) getOrElse lex
+
+    /** Current property*/
+    val name:Option[Json] = if (first ? "}") None else Some(Str(first))
+    val value:Option[Json] = name.map(j => Json(j.out.next(":")))
+
+    /** Subsequent properties */
+    val tail:Option[Obj] =
+      if ( value forall (_.out ? "}") ) None
+      else Some (Obj(value.get.out,","))
+
+    /** Recursively parse all elements */
+    override def out:Lexer = toMap.toList.last._2.out
+
+    /** Wrap as sequence */
+    lazy val toMap:Map[Json,Json]= name.map { n =>
+      tail map ( _.toMap + ((n,value.get)) ) getOrElse ListMap((n,value.get))
+    } getOrElse ListMap()
+
+    override def toString:String = s"${getClass.getName}(${toMap.toList.mkString(",")})"
+
+  }
+
   case class Num(in:Lexer) extends Json(in) {
-    val value:Double = in.^.double
-    override def toString=value.toString
-    override def toNum=Some(this)
+    val value:Double = in.tok.get.toDouble
   }
 
   case class Str(in:Lexer) extends Json(in) {
-    val value:String= in.^.string
-    override def toString= '"' + value + '"'
-    override def toStr = Some(this)
+    val value:String= in.tok.toString.replace("\"","")
   }
 
-  case class Null(in:Lexer) extends Json(in) {
-    require(in.first == "null")
-    override def isNull = true
-  }
-
-  case class Bool(in:Lexer) extends Json(in) {
-    require( isTrue | isFalse)
-    override def isTrue = in ? "true"
-    override def isFalse = in ? "false"
+  case class Sym(in:Lexer) extends Json(in) {
+    require( isTrue | isFalse | isNull)
+    def isTrue:Boolean = in ? "true"
+    def isFalse:Boolean = in ? "false"
+    def isNull:Boolean = in ? "null"
 
   }
-
-
-
 }
-
-
