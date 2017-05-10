@@ -2,19 +2,20 @@
   * Created by Dirk on 21.04.17.
   */
 
+import scala.collection.immutable.ListMap
+
+import java.util.Scanner
+import java.util.regex.Pattern
+
 import Json.{Arr, Lexer, Num, Str}
 import scala.collection.immutable.ListMap
 import scala.util.matching.Regex.Match
 import scala.util.matching.Regex
 
 /** Parsed JSON String.
-  * @param in Start of parsing
   */
-abstract class Json(in:Lexer) {
-  /** After parsing */
-  def out:Lexer = in.next()
-  override def toString = s"${getClass.getName}(${in.tok.get})"
-}
+trait Json
+
 
 /**
   *
@@ -25,83 +26,97 @@ abstract class Json(in:Lexer) {
   * @see https://en.wikipedia.org/wiki/Lexical_analysis
   * @see https://en.wikipedia.org/wiki/Recursive_descent_parser
   * @see https://en.wikipedia.org/wiki/Parser_combinator
+  * @see https://jazzy.id.au/2012/11/06/iteratees_for_imperative_programmers.html
   */
 object Json {
 
   val regex:Regex = """(?:\s*)([\{\}\[\]:,]|"[^"]*"|[\d-+.eE]+|null|true|false)""".r
 
-  /** Call methods like 'next' without need to wrap string as option  **/
+  /** Call methods like 'next' withafter need to wrap string as option  **/
   implicit def Str2Opt( x : String) : Option[String] = Option(x)
 
-  def apply(in:Lexer):Json =
-    in.tok.get.charAt(0) match {
-      case '[' => Arr(in,Some("["))
-      case '{' => Obj(in,Some("{"))
-      case '"' => Str(in)
-      case 'n' | 't' | 'f' => Sym(in)
-      case _ => Num(in)
+  def apply(s:String):Json=apply(new Scanner(s))
+
+  def apply(l:Lexer):Parsed =
+    l.tok.get.charAt(0) match {
+      case '[' => new Arr(l,"[")
+      case '{' => new Obj(l,"{")
+      case '"' => new Str(l)
+      case 'n' => new Null(l)
+      case 't' => new True(l)
+      case 'f' => new False(l)
+      case _ => new Num(l)
     }
 
-  def apply(s:String):Json=apply(new Lexer(s))
+  case class Parsed(json:Json,lex:Lexer)
 
-  case class Num(in:Lexer) extends Json(in) {
-    val value:Double = in.tok.get.toDouble
+  implicit class ScannerOps(val l:Lexer) {
+    def next:String = s.next(Json.regex)
+    def ?(str:String):Boolean = s.`match`.group(1) == str
   }
 
-  case class Str(in:Lexer) extends Json(in) {
-    val value:String= in.tok.toString.replace("\"","")
+  class Num(l:Lexer) extends Json {
+    val value:Double = s.next.toDouble
   }
 
-  case class Sym(in:Lexer) extends Json(in) {
-    require( isTrue | isFalse | isNull)
-    def isTrue:Boolean = in ? "true"
-    def isFalse:Boolean = in ? "false"
-    def isNull:Boolean = in ? "null"
+  class Str(l:Lexer) extends Json {
+    val value:String= s.next.replace("\"","")
   }
+
+  class Sym(l:Lexer) extends Json {
+    require ( s.next == toString)
+  }
+
+  class True(l:Lexer) extends Sym(s) {
+    override def toString="true"
+  }
+
+  class False(l:Lexer) extends Sym(s) {
+    override def toString="false"
+  }
+
+  class Null(l:Lexer) extends Sym(s) {
+    override def toString="null"
+  }
+
+
 
   /** A parsed JSON array. It works like a list:
     * 'head' points to current element, 'tail' to successors. */
-  case class Arr(lex:Lexer, consume:Option[String]=None) extends Json(lex) {
+  class Arr(l:Lexer, consume:Option[String]=None) extends Json {
 
-    private def first=consume.map ( lex next _ ) getOrElse lex
+    consume.foreach (s next _)
 
-    /** Current Array element */
-      val head:Option[Json] = if (first ? "]") None else Some(Json(first))
+    /** Current Array element. None if empty array*/
+      val head:Option[Json] = if (s hasNext "]") {s.next;None} else Some(Json(s))
 
       /** Subsequent array elements ore none for last element */
-      val tail:Option[Arr] =
-        if ( head forall (_.out ? "]") ) None
-        else Some (Arr(head.get.out,","))
+      val tail:Option[Arr] = if ( s.hasNext("]") ) {s.next;None} else Some (new Arr(s,","))
 
-      /** Recursively parse all elements */
-      override def out:Lexer = toSeq.lastOption.map (_.out).getOrElse(first).next("]")
 
-      /** Wrap as sequence */
+    /** Wrap as sequence */
       lazy val toSeq:Seq[Json]= head.map { h =>
         tail map (h :: _.toSeq.toList) getOrElse List(h)
         } getOrElse List()
 
-      override def toString:String = s"${getClass.getName}(${toSeq.mkString(",")})"
+      override def toString:String = s"[${toSeq.mkString(",")}]"
     }
 
   /** A parsed JSON object. It works like a MapList:
     * 'head' points to current (name,value) pair, 'tail' to successor pairs. */
-  case class Obj(lex:Lexer, consume:Option[String]=None) extends Json(lex) {
+  case class Obj(l:Lexer, consume:Option[String]=None) extends Json {
 
-    private def first=consume.map ( lex next _ ) getOrElse lex
+    consume.foreach (s next _)
 
     /** Current property name */
-    val name:Option[Json] = if (first ? "}") None else Some(Str(first))
+    val name:Option[Json] = if (s hasNext "}") {s.next;None} else Some(new Str(s))
     /** Current property value */
-    val value:Option[Json] = name.map(j => Json(j.out.next(":")))
+    val value:Option[Json] = name.map(j => Json(s.next(":")))
+
 
     /** Parses all subsequent properties */
-    val tail:Option[Obj] =
-      if ( value forall (_.out ? "}") ) None
-      else Some (Obj(value.get.out,","))
+    val tail:Option[Obj] = if ( s.hasNext("}") ) {s.next;None} else Some (new Obj(s,","))
 
-    /** First token after tail */
-    override def out:Lexer = toMap.toList.last._2.out
 
     /** Wrap as sequence */
     lazy val toMap:Map[Json,Json]= name.map { n =>
@@ -109,14 +124,13 @@ object Json {
     } getOrElse ListMap()
 
     override def toString:String = s"${getClass.getName}(${toMap.toList.mkString(",")})"
-
   }
 
   /**
     * Parses JSON String into sequence of string tokens.
     * Use 'tok' to access current token and '>>' to progress to next token.
     */
-  case class Lexer(s:CharSequence) {
+   class Lexer(s:CharSequence) {
 
     val fm:Option[Match] = Json.regex.findPrefixMatchOf(s)
 
@@ -132,13 +146,14 @@ object Json {
     def next(check:Option[String]=None):Lexer= {
       if (!check.forall(?(_))) throw
         new IllegalArgumentException(s"$check expected at $this")
-      Lexer (fm.get.after)
+      new Lexer (fm.get.after)
     }
 
     def toSeq:Seq[String]= tok map { _ :: next().toSeq.toList } getOrElse List()
 
     override def toString = s"Lexer($s)"
   }
+
 
   object Test {
     // TODO: http://www.scalatest.org/
