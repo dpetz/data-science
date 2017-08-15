@@ -18,7 +18,10 @@ object Reader {
   private class SourceReader(src:Source) extends Reader {
     lazy val char:Char=src.next()
     lazy val hasNext:Boolean=src.hasNext
-    lazy val next:Reader= new SourceReader(src)
+    lazy val next:Reader= {
+      char // trigger src.next()
+      new SourceReader(src)
+    }
   }
   def apply(s:String):Reader=new SourceReader(Source.fromString(s))
 }
