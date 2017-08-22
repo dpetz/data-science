@@ -1,6 +1,6 @@
 package io
 
-import io.Parser.{Cons, Rex}
+import io.Parser.{Cons, Fail, Parsed, Rex}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -110,15 +110,15 @@ object Parser {
     def apply(r:Reader)={
 
       @tailrec
-      def repeatNext(p:Parser[A], min:Int,max:Int, ms:Match[Seq[A]]):Parsed[Seq[A]]=
-        p(r) map { List(_,ms.result) } { m =>
-          if (max > 1) repeatNext(p, min - 1, max - 1, m)
-          else m
-        } atFail { f =>
-          if (min<1) ms else Fail[B](this)
+      def collectNext(p:Parser[A], min:Int,max:Int, ms:Match[Seq[A]]):Parsed[Seq[A]]={
+        if (max == 0 || min < 1) return ms
+        p(r) map { ms.result :+ _} apply {
+          ms => return collectNext(p, min-1, max-1, ms)
+        } atFail { f:Fail[A] =>
+          if (min<1) return ms else return Fail[Seq[A]](f)
+        }
       }
-    }
-      repeatNext(p,min,max,Nil)
+      collectNext(p,min,max,Vector[Seq[A]]())
     }
 
   }

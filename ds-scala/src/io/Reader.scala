@@ -19,12 +19,12 @@ trait Reader {
     /** Accumulator parameter to allow recursive call optimization.
       * See https://stackoverflow.com/questions/6005392/isnt-that-code-in-tail-recursive-style */
     @tailrec
-    def nextAsList(l:List[Char], r:Reader, n:Int):Seq[Char] = {
+    def collectNext(l:Seq[Char], r:Reader, n:Int):Seq[Char] = {
       if (!r.hasNext) return ">DNE<".toCharArray ++ l
       if (n==0) return l
-      return nextAsList(r.char :: l, r.next, n-1)
+      return collectNext(l :+ r.char, r.next, n-1)
     }
-    nextAsList(Nil, this,n).reverse.mkString
+    collectNext(Vector(), this,n).mkString
   }
 
   override def toString=s"Reader(${next(5)}...)"
