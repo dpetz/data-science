@@ -2,10 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="93630ab0-6587-4002-94ba-06a6b106034d" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/io/Json.scala" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/io/Parser.scala" afterPath="$PROJECT_DIR$/src/io/Parser.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/io/Reader.scala" afterPath="$PROJECT_DIR$/src/io/Reader.scala" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <ignored path="$PROJECT_DIR$/target/" />
@@ -532,7 +529,14 @@
       <option name="project" value="LOCAL" />
       <updated>1503437416129</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Json Array working.">
+      <created>1504463049560</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1504463049561</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TodoView">
@@ -590,7 +594,8 @@
     <MESSAGE value="And parser" />
     <MESSAGE value="&quot;Then&quot; parser completed" />
     <MESSAGE value="Started &quot;Repeat&quot;" />
-    <option name="LAST_COMMIT_MESSAGE" value="Started &quot;Repeat&quot;" />
+    <MESSAGE value="Json Array working." />
+    <option name="LAST_COMMIT_MESSAGE" value="Json Array working." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
