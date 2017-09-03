@@ -1,6 +1,6 @@
 package io
 
-import io.Parser.{Cons, Fail, Parsed, Repeat, Rex}
+import io.Parser.{Cons, Fail, Result, Rep, Rex}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -9,18 +9,18 @@ import scala.collection.mutable.ArrayBuffer
 object Parser {
 
   /** Result of applying Parser to Stream */
-  sealed trait Parsed[+A] {
+  sealed trait Result[+A] {
 
     def follow: Reader
 
     /** Map result if Match. */
-    def map[B](f: A => B): Parsed[B]
+    def map[B](f: A => B): Result[B]
 
     /** Map this instance if Match. */
-    def apply[B](f: (Match[A] => Parsed[B])): Parsed[B]
+    def apply[B](f: (Match[A] => Result[B])): Result[B]
 
     /** Map this instance if if Fail **/
-    def atFail[B >: A](f: Fail[A] => Parsed[B]): Parsed[B]
+    def atFail[B >: A](f: Fail[A] => Result[B]): Result[B]
 
     //def flat[B]:Parsed[B]
 
@@ -28,44 +28,28 @@ object Parser {
   }
 
   /** @param follow : Reader after parsed content has been consumed */
-  case class Match[+A](result: A, follow: Reader) extends Parsed[A] {
+  case class Match[+A](result: A, follow: Reader) extends Result[A] {
     def map[B](f: A => B) = Match(f(result), follow)
 
-    def apply[B](f: (Match[A] => Parsed[B])) = f(this)
+    def apply[B](f: (Match[A] => Result[B])) = f(this)
 
-    def atFail[B >: A](f: Fail[A] => Parsed[B]) = this
+    def atFail[B >: A](f: Fail[A] => Result[B]) = this
 
     /** New match with results combined by function and reader from second match */
     def add[B,C](m:Match[B])(f:(A,B)=>C ):Match[C]=Match(f(result,m.result),m.follow)
-/*
-    def flat[B]={
-
-      def help(remainder:Seq[_], result:Seq[_]):Seq[_]
-
-      result match {
-        case s:Seq[B] =>
-
-
-      }
-
-
-    }
-    */
 
     //def asMatch = this
   }
 
 
-  case class Fail[+A](parser: Parser[_], follow: Reader) extends Parsed[A] {
+  case class Fail[+A](parser: Parser[_], follow: Reader) extends Result[A] {
     def map[B](f: A => B) = Fail[B](this)
 
-    def apply[B](f: Match[A] => Parsed[B]) = Fail[B](this)
+    def apply[B](f: Match[A] => Result[B]) = Fail[B](this)
 
     override def toString = s"$parser failed parsing: $follow"
 
-    def atFail[B >: A](f: Fail[A] => Parsed[B]) = f(this)
-
-    //def flat[B]=Fail[B](parser,follow)
+    def atFail[B >: A](f: Fail[A] => Result[B]) = f(this)
 
     //def asMatch = throw new ClassCastException
   }
@@ -77,14 +61,37 @@ object Parser {
   /* Can be applied to a Stream to produce a Match[A] */
   trait Parser[+A] {
     /* Parse from character stream. */
-    def apply(r: Reader): Parsed[A]
+    def apply(r: Reader): Result[A]
 
     /* Shortcut for apply(Reader(s)) */
-    def apply(s: String): Parsed[A] = apply(Reader(s))
+    def apply(s: String): Result[A] = apply(Reader(s))
 
     /* Infix operator for Then(this,p) */
     def ~[B >: A](p: Parser[B]):Parser[Seq[B]] = Then(this, p)
+
+    def |[B >: A](p: Parser[B]):Parser[B] = Or(this, p)
+
+    def >[B](f:A=>B):Parser[B]=Trans(this,f)
+
   }
+
+  /** Translate */
+  case class Trans[A,B](p:Parser[A],f:A=>B) extends Parser[B] {
+    def apply(r:Reader)=p(r) map { f(_) }
+  }
+
+  case class Gate[A,B,C](start:Parser[A], p:Parser[B], end:Parser[C]) extends Parser[B] {
+    def apply(r:Reader)=Pre(start,Post(p,end))(r)
+  }
+
+  case class Pre[A,B](pre:Parser[A], p:Parser[B]) extends Parser[B] {
+    def apply(r:Reader)= Then(pre,p)(r) map { _.tail match { case s:Seq[B] => s.head case b:B => b } }
+  }
+
+  case class Post[A,B](p:Parser[A], post:Parser[B]) extends Parser[A] {
+    def apply(r:Reader)= Then(p,post)(r) map { _.dropRight(1) match { case s:Seq[A] => s.head case a:A => a } }
+  }
+
 
   /** Parse next n characters from stream into string */
   case class Chars(n: Int) extends Parser[String] {
@@ -118,14 +125,16 @@ object Parser {
       else Fail(this, r)
   }
 
+
+
   case class Or[A](p1:Parser[A], p2:Parser[A]) extends Parser[A] {
-    def apply(r: Reader):Parsed[A] = p1(r).atFail { _ => p2(r) }
+    def apply(r: Reader) = p1(r).atFail { _ => p2(r) }
   }
 
   implicit class Str2Cons(s: String) extends Cons(s)
 
   implicit class Parser2SeqParser[+A](p: Parser[A]) extends Parser[Seq[A]] {
-    def apply(r: Reader) = p(r).map(List(_))
+    def apply(r: Reader) = p(r).map(Vector(_))
   }
 
   /** p1 followed by p2 **/
@@ -150,12 +159,13 @@ object Parser {
     override def toString = s"Rex($n)($reStr)"
   }
 
-  case class Repeat[A](p: Parser[A], min: Int = 0, max: Int = Int.MaxValue) extends Parser[Seq[A]] {
+  /** Repeat */
+  case class Rep[A](p: Parser[A], min: Int = 0, max: Int = Int.MaxValue) extends Parser[Seq[A]] {
 
     def apply(r: Reader) = {
 
       @tailrec
-      def recurse(p: Parser[A], r:Reader, min: Int, max: Int, ms: Match[Seq[A]]) : Parsed[Seq[A]]= {
+      def recurse(p: Parser[A], r:Reader, min: Int, max: Int, ms: Match[Seq[A]]) : Result[Seq[A]]= {
         if (max < 1) return ms
         p(r) match {
           case m: Match[A] =>
@@ -173,9 +183,9 @@ object Parser {
   object Test {
 
     def and {
-      import io.Parser.{Repeat, Str2Cons}
+      import io.Parser.{Rep, Str2Cons}
       val r = Reader("2017-08-26")
-      val p = Repeat(Rex(5)("""\d+-?"""))
+      val p = Rep(Rex(5)("""\d+-?"""))
       println(p(r).toString)
     }
   }
