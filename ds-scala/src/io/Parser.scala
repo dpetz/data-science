@@ -85,11 +85,12 @@ object Parser {
   }
 
   case class Pre[A,B](pre:Parser[A], p:Parser[B]) extends Parser[B] {
-    def apply(r:Reader)= Then(pre,p)(r) map { _.tail match { case s:Seq[B] => s.head case b:B => b } }
+    def apply(r:Reader)= pre(r) { m => p(m.follow)  }
+
   }
 
   case class Post[A,B](p:Parser[A], post:Parser[B]) extends Parser[A] {
-    def apply(r:Reader)= Then(p,post)(r) map { _.dropRight(1) match { case s:Seq[A] => s.head case a:A => a } }
+    def apply(r:Reader)= p(r) { m1 => post(m1.follow) { m2 => m1.add(m2) { (r1,_) => r1 }}}
   }
 
 
@@ -125,6 +126,7 @@ object Parser {
       else Fail(this, r)
   }
 
+  val Spaces = Rep(OneOf(Set('\n','\t',' ','\r')))
 
 
   case class Or[A](p1:Parser[A], p2:Parser[A]) extends Parser[A] {
