@@ -1,7 +1,8 @@
 #https://www.safaribooksonline.com/library/view/bayesian-analysis-with/9781785883804/ch01s03.html#ch01lvl3sec05
 
 from scipy import stats
-import matplotlib as plt
+import matplotlib.pyplot as plt
+import numpy as np
 
 theta_real = 0.35
 trials = [0, 1, 2, 3, 4, 8, 16, 32, 50, 150]
