@@ -5,12 +5,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 theta_real = 0.35
+
+# Number of trials per experiment
 trials = [0, 1, 2, 3, 4, 8, 16, 32, 50, 150]
+# Number of heads per experiment
 data = [0, 1, 1, 1, 1, 4, 6, 9, 13, 48]
 
-beta_params = [(1, 1), (0.5, 0.5), (20, 20)]
+
+
+# Choose beta distribution as prior
+# It's popular in Bayesian Analysis because it can model
+# many different shapes (uniform, Gaussian, U-like, ...)
+# and the conjugate prior probability distribution for the
+# # Bernoulli, binomial, negative binomial and geometric distributions.
+# https://stats.stackexchange.com/questions/47771/what-is-the-intuition-behind-beta-distribution
 dist = stats.beta
+
+
+# Compare different priors.
+# Expected value of beta distribution is ( p / (p + q) )
+beta_params = [(1, 1), (0.5, 0.5), (20, 20)]
+
+
 x = np.linspace(0, 1, 100)
+
+fig = plt.figure(figsize=(8, 6))
 
 for idx, N in enumerate(trials):
     if idx == 0:
@@ -31,3 +50,4 @@ for idx, N in enumerate(trials):
     plt.legend()
     plt.gca().axes.get_yaxis().set_visible(False)
 plt.tight_layout()
+plt.show()
