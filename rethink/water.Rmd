@@ -1,0 +1,41 @@
+---
+title: "Statistical Rethinking"
+output: html_document:
+fig_width: 6
+fig_height: 4
+---
+
+Examples from [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). Markdown [cheatsheet](https://rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf)
+
+Data Story:
+
+* Globe with proportion $p$ of water $W$
+
+* Throw & catch globe and put finger at random place has probability     $p$ of water $W$ or probability $(1-p)$ of land $L$
+
+* Tosses are independent
+
+Likelihood is binomial distributed. Grid approximation of posterioir:
+```{r}
+plot_posterior_grid <- function(prior) {
+  likelihood <- dbinom(6, size=9, prob=p_grid)
+  unstd.posterior <- likelihood * prior
+  posterior <- unstd.posterior / sum(unstd.posterior)
+  plot(p_grid,posterior,type='b', xlab='probability of water', ylab='posterior probability')
+  mtext("20 points")
+}
+
+plot_posterior_grid( rep(1,20) )
+```
+
+I know world has more than 50% qwater:
+```{r}
+prior <- ifelse( p_grid < 0.5, 0, 1 )
+plot_posterior_grid( prior )
+```
+
+If I believed 50% is most likely:
+```{r}
+prior <- exp( -5*abs( p_grid - 0.5 ) )
+plot_posterior_grid( prior )
+```
