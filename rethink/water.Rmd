@@ -1,13 +1,14 @@
 ---
-title: "Statistical Rethinking"
-output: html_document:
-fig_width: 6
-fig_height: 4
+title: "Water"
+output: html_notebook
 ---
+
 
 Examples from [Statistical Rethinking](https://xcelab.net/rm/statistical-rethinking/). Markdown [cheatsheet](https://rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf)
 
-Data Story:
+To render html in GitHub prefix `https://htmlpreview.github.io/?` to URL.
+
+### Data Story
 
 * Globe with proportion $p$ of water $W$
 
@@ -15,7 +16,9 @@ Data Story:
 
 * Tosses are independent
 
-Likelihood is binomial distributed. Grid approximation of posterioir:
+### Grid approximation of posterior
+
+Likelihood is binomial distributed.
 ```{r}
 plot_posterior_grid <- function(prior) {
   likelihood <- dbinom(6, size=9, prob=p_grid)
