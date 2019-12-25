@@ -10,28 +10,33 @@ install.packages(c("coda","mvtnorm","devtools"))
 library(devtools)
 devtools::install_github("rmcelreath/rethinking")
 ```
-Load *!KungSan* data set created by *Nancy Howell* in the 1960s:
+Load *!KungSan* data set created from field interviews by *Nancy Howell* in the 1960s:
 ```{r}
 library(rethinking)
 data(Howell1)
 d <- Howell1
 str(d)
 ```
-Model:
+To get started, model without predictors.
+$\mu$ has no subscript so its the same estimate for all observations.
+Height is like many measures in nature normal distributed because it may be seen as the result
+of a series of small biological steps. Suming those "samples" up from any distribution yields
+a normal distribution ([Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem))
+
 $$
 h_i \sim Normal(\mu,\sigma) \\
 \mu \sim Normal(178,20) \\
 \sigma \sim Uniform(0,50)
 $$
-Prior for height's mean:
+
+I use my height as prior for mean. A $\sigma$ of 20 encodes that 95% of individuals are at least 158cm and at most 189cm. Plot the priors:
 ```{r}
+par(mfrow=c(1,2))
+curve(dunif(x,0,50),from=-10,to=60)
 curve(dnorm(x,178,20),from=100,to=250)
 ```
-Prior for height's variance:
-```{r}
-curve(dunif(x,0,50),from=-10,to=60)
-```
-Simulate height by sampling from prior:
+
+Simulate height by sampling from prior: 
 ```{r}
 sample_mu <- rnorm(1e4,178,20)
 sample_sigma <- runif(1e4,0,50)
@@ -39,3 +44,42 @@ prior_h <- rnorm(1e4,sample_mu,sample_sigma)
 dens(prior_h)
 ```
 
+# Posterior Distribution
+
+## Grid Approximation
+
+In simple cases like this the posterior distribution can be mapped via
+brute force calculation:
+```{r}
+d2 <- d [ d$age >= 18 , ]
+
+# Produce every mu-sigma-combination.
+post <- expand.grid( mu=mu.list, sigma=sigma.list )
+
+# Calculate log-likelihood (to avoid rounding errors)
+post$LL <- sapply( 1:nrow(post), function(i) sum ( dnorm(
+  d2$height,
+  mean=post$mu[i],
+  sd=post$sigma[i],
+  log=TRUE ) ) )
+
+# Multiply priors with likelihoods (ie. add at log scale)
+post$prod <- post$LL + dnorm( post$mu , 178 , 20 , TRUE ) +
+  dunif( post$sigma , 0 , 50 , TRUE  )
+
+# Every parameter sample has almost zero probability so we
+# rescale them for relative values (ie. no longer pobabilities)
+post$prob <- exp( post$prod - max(post$prod) )
+
+contour_xyz( post$mu , post$sigma , post$prob,
+  xlab=expression(mu), ylab=expression(sigma) )
+```
+
+# Sample from the Posterior
+
+```{r}
+sample.rows <- sample( 1:nrow(post) , size=1e4 , replace=TRUE , prob=post$prob )
+sample.mu <- post$mu[ sample.rows ]
+sample.sigma <- post$sigma[ sample.rows ]
+plot( sample.mu , sample.sigma , cex=0.5 , pch=16 , col=col.alpha(rangi2,0.1) )
+```
