@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.pythonPath": "/Users/dpetzoldt/opt/anaconda3/envs/rethink/bin/python3.7"
+	}
+}
