@@ -1,0 +1,9 @@
+name: rethink
+dependencies:
+  - python=3.7.7
+  - pandas=1.0.3
+  - numpy=1.18.1
+  - ipykernel
+  - seaborn
+  - pytest
+  - scipy
